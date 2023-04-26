@@ -48,7 +48,7 @@ on:
         required: true
 
 # Ensures that only one workflow runs at a time
-concurrency: ${{ inputs.concurrency_group }}
+concurrency: ${{ github.ref }}-${{ github.workflow }}
 
 defaults:
   run:
