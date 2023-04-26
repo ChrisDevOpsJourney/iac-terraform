@@ -85,7 +85,7 @@ jobs:
         if: ${{ steps.fmt.outputs.status == 'true' }}
         uses: peter-evans/create-pull-request@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.GH_TOKEN }}
           branch: terraform/fmt/${{ github.event.pull_request.head.ref_name || github.ref_name }}
           labels: terraform-fmt, ${{ github.event.pull_request.head.ref_name || github.ref_name }}
           title: Terraform fmt
