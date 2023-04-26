@@ -57,7 +57,7 @@ defaults:
 jobs:
   # Check if the code in the terraform working directory is formatted correctly and create a pull request if not
   fmt:
-    runs-on: ${{ inputs.github_runner }}
+    runs-on: ${{ inputs.github-runner }}
     outputs:
       status: ${{ steps.fmt.outputs.status || 'false' }}
     steps:
@@ -66,7 +66,7 @@ jobs:
 
       - name: Terraform format
         id: fmt
-        working-directory: ${{ inputs.terraform_working_directory }}
+        working-directory: ${{ inputs.working-directory }}
         run: |
           terraform fmt -diff -recursive
           if [[ ! -z $(git status -s) ]]; then
