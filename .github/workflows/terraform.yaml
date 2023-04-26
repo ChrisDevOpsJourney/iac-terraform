@@ -54,6 +54,10 @@ defaults:
   run:
     shell: bash
 
+permissions:
+  contents: write
+  pull-requests: write
+
 jobs:
   # Check if the code in the terraform working directory is formatted correctly and create a pull request if not
   fmt:
