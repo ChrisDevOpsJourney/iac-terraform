@@ -5,8 +5,8 @@ on:
 #    paths:
 #      - '**.tf'
 #      - '**.yaml'
-#  pull_request:
-#    types: [opened, reopened, synchronize, closed]
+  pull_request:
+    types: [opened, reopened, synchronize, closed]
   workflow_dispatch:
 
 
