@@ -101,5 +101,5 @@ jobs:
             terraform-fmt
             automated pr
             ${{ github.event.pull_request.head.ref_name || github.ref_name }}
-          assignees: ${{ github.actor }}
-          reviewers: ${{ github.actor }}
+#           assignees: ${{ github.actor }}
+#           reviewers: ${{ github.actor }}
