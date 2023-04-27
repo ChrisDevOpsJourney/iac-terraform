@@ -117,7 +117,7 @@ jobs:
     needs:
       - fmt
     if: ${{ needs.fmt.outputs.status == 'false' }}
-    runs-on: ${{ inputs.github_runner }}
+    runs-on: ${{ inputs.github-runner }}
     outputs:
       status: ${{ steps.check.outputs.status || 'false' }}
     steps:
@@ -204,7 +204,7 @@ jobs:
       - fmt
       - workspace
     if: ${{ needs.fmt.outputs.status == 'false' && needs.workspace.outputs.status == 'true' && github.event_name == 'pull_request' }}
-    runs-on: ${{ inputs.github_runner }}
+    runs-on: ${{ inputs.github-runner }}
 
     steps:
       - uses: actions/checkout@v3
