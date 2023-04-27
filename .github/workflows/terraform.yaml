@@ -79,6 +79,13 @@ jobs:
             echo "status=true" >> $GITHUB_OUTPUT
           fi
 
+      - name: Remove terraform/fmt/(branch) if exists (to avoid conflicts)
+        if: ${{ steps.fmt.outputs.status == 'true' }}
+        run: |
+          branch_name="terraform/fmt/${{ github.event.pull_request.head.ref_name || github.ref_name }}"
+          if [[ ! -z $(git ls-remote --exit-code --heads origin $branch_name) ]]; then
+            git push origin --delete $branch_name
+          fi
 
       - name: Create pull request
         if: ${{ steps.fmt.outputs.status == 'true' }}
@@ -103,3 +110,197 @@ jobs:
             ${{ github.event.pull_request.head.ref_name || github.ref_name }}
 #           assignees: ${{ github.actor }}
 #           reviewers: ${{ github.actor }}
+
+
+  # Check if the name of the current checkout branch exists in the environment directories
+  workspace:
+    needs:
+      - fmt
+    if: ${{ needs.fmt.outputs.status == 'false' }}
+    runs-on: ${{ inputs.github_runner }}
+    outputs:
+      status: ${{ steps.check.outputs.status || 'false' }}
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Check environment directory
+        id: check
+        run: |
+          if [ -d '${{ inputs.environments-directory }}/${{ github.event.pull_request.head.ref_name || github.ref_name }}' ]; then
+            echo "status=true" >> $GITHUB_OUTPUT
+          fi
+
+  # Generate terraform doc file (README.md) for current workspace and create pull request if needed
+  docs:
+    needs:
+      - fmt
+      - workspace
+    if: ${{ needs.fmt.outputs.status == 'false' && needs.workspace.outputs.status == 'true' }}
+    runs-on: ${{ inputs.github-runner }}
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Terraform docs
+        id: docs
+        # @see https://github.com/terraform-docs/gh-actions
+        uses: terraform-docs/gh-actions@v1
+        with:
+          working-dir: ${{ inputs.environments-directory }}/${{ github.event.pull_request.head.ref_name || github.ref_name }}
+
+      - name: Remove terraform/docs/(workspace) branch if exists (to avoid conflicts)
+        if: ${{ steps.docs.outputs.num_changed > 0 }}
+        run: |
+          branch_name="terraform/docs/${{ github.event.pull_request.head.ref_name || github.ref_name }}"
+          if [[ ! -z $(git ls-remote --exit-code --heads origin $branch_name) ]]; then
+            git push origin --delete $branch_name
+          fi
+      - name: Create pull request
+        if: ${{ steps.docs.outputs.num_changed > 0 }}
+        uses: peter-evans/create-pull-request@v4
+        with:
+          token: ${{ secrets.PAT }}
+          commit-message: Terraform docs
+          committer: GitHub <noreply@github.com>
+          author: ${{ github.actor }} <${{ github.actor }}@users.noreply.github.com>
+          branch: terraform/docs/${{ github.event.pull_request.head.ref_name || github.ref_name }}
+          signoff: false
+          delete-branch: true
+          title: Terraform docs
+          body: |
+            Terraform docs was launched and generated the documentation in this pull request.
+          labels: |
+            terraform-fmt
+            automated pr
+            ${{ github.event.pull_request.head.ref_name || github.ref_name }}
+
+  # Check if the terraform code is valid and comment on the pull request if not
+  lint:
+    needs:
+      - fmt
+      - workspace
+    if: ${{ needs.fmt.outputs.status == 'false' && needs.workspace.outputs.status == 'true' && github.event_name == 'pull_request' }}
+    runs-on: ${{ inputs.github-runner }}
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Terraform lint
+        # @see https://github.com/reviewdog/action-tflint
+        uses: reviewdog/action-tflint@v1
+        with:
+          github_token: ${{ secrets.PAT }}
+          working_directory: ${{ inputs.environments-directory }}/${{ github.event.pull_request.head.ref_name || github.ref_name }}
+          reporter: github-pr-check
+          fail_on_error: true
+          filter_mode: nofilter
+          level: error
+          flags: ""
+          tflint_init: true
+
+  # Check if the terraform code is secure and comment on the pull request if not
+  security:
+    needs:
+      - fmt
+      - workspace
+    if: ${{ needs.fmt.outputs.status == 'false' && needs.workspace.outputs.status == 'true' && github.event_name == 'pull_request' }}
+    runs-on: ${{ inputs.github_runner }}
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Terraform security
+        # @see https://github.com/reviewdog/action-tfsec
+        uses: reviewdog/action-tfsec@v1
+        with:
+          github_token: ${{ secrets.PAT }}
+          working_directory: ${{ inputs.environments-directory }}/${{ github.event.pull_request.head.ref_name || github.ref_name }}
+          reporter: github-pr-check
+          fail_on_error: true
+          filter_mode: nofilter
+          level: error
+          flags: ""
+          tfsec_flags: --force-all-dirs
+
+  # Plan the terraform code and create pull request if needed
+  plan:
+    needs:
+      - fmt
+      - workspace
+    if: ${{ needs.fmt.outputs.status == 'false' && needs.workspace.outputs.status == 'true' && github.event_name == 'push' }}
+    runs-on: ${{ inputs.github-runner }}
+    outputs:
+      status: ${{ steps.plan.outputs.status || 'false' }}
+    defaults:
+      run:
+        working-directory: ${{ inputs.environments-directory }}/${{ github.event.pull_request.head.ref_name || github.ref_name }}
+    env:
+      TF_CLOUD_ORGANIZATION: ${{ secrets.TF_ORGANIZATION }}
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          cli_config_credentials_hostname: ${{ inputs.terraform_hostname }}
+          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
+
+      - name: Terraform version
+        run: terraform --version
+
+      - name: Terraform init
+        run: |
+          terraform init
+      - name: Terraform validate
+        run: |
+          terraform validate
+      - name: Terraform plan
+        id: plan
+        run: |
+          terraform plan -input=false -no-color 2>&1 | tee terraform.plan
+          if [[ ! -z $(git status -s) ]]; then
+            echo "status=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Terraform plan status
+        if: steps.plan.outcome == 'failure'
+        run: exit 1
+
+      - name: Get Terraform cloud plan URL
+        if: ${{ steps.plan.outputs.status == 'true' }}
+        id: plan_url
+        run: |
+          match=$(head -50 terraform.plan | egrep -i 'https:\/\/.*\/runs\/run-\S+')
+          echo "url=$match" >> $GITHUB_OUTPUT
+        continue-on-error: true
+
+      - name: Remove terraform/plan/(workspace) branch if exists (to avoid conflicts)
+        if: ${{ steps.plan.outputs.status == 'true' }}
+        run: |
+          branch_name="terraform/plan/${{ github.event.pull_request.head.ref_name || github.ref_name }}"
+          if [[ ! -z $(git ls-remote --exit-code --heads origin $branch_name) ]]; then
+            git push origin --delete $branch_name
+          fi
+      - name: Create pull request
+        if: ${{ steps.plan.outputs.status == 'true' }}
+        uses: peter-evans/create-pull-request@v4
+        with:
+          token: ${{ secrets.PAT }}
+          commit-message: Terraform plan
+          committer: GitHub <noreply@github.com>
+          author: ${{ github.actor }} <${{ github.actor }}@users.noreply.github.com>
+          branch: terraform/plan/${{ github.event.pull_request.head.ref_name || github.ref_name }}
+          signoff: false
+          delete-branch: true
+          title: Terraform plan
+          body: |
+            Terraform plan was launched in this pull request:
+            Plan URL: ${{ steps.plan_url.outputs.url }}
+            ```
+            ${{ steps.plan.outputs.stdout }}
+            ```
+          labels:
+            terraform-plan
+            automated pr
+            ${{ github.event.pull_request.head.ref_name || github.ref_name }}
