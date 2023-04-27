@@ -46,6 +46,8 @@ on:
       # @see https://developer.hashicorp.com/terraform/cloud-docs/users-teams-organizations/organizations#creating-organizations
       TF_ORGANIZATION:
         required: true
+      PAT:
+        required: true
 
 # Ensures that only one workflow runs at a time
 concurrency: ${{ github.ref }}-${{ github.workflow }}
