@@ -77,24 +77,27 @@ jobs:
             echo "status=true" >> $GITHUB_OUTPUT
           fi
 
-      - name: Remove terraform/fmt/(branch) if exists (to avoid conflicts)
-        if: ${{ steps.fmt.outputs.status == 'true' }}
-        run: |
-          branch_name="terraform/fmt/${{ github.event.pull_request.head.ref_name || github.ref_name }}"
-          if [[ ! -z $(git ls-remote --exit-code --heads origin $branch_name) ]]; then
-            git push origin --delete $branch_name
-          fi
 
       - name: Create pull request
         if: ${{ steps.fmt.outputs.status == 'true' }}
         uses: peter-evans/create-pull-request@v5
         with:
           token: ${{ secrets.PAT }}
+          commit-message: Terraform code format
+          committer: GitHub <noreply@github.com>
+          author: ${{ github.actor }} <${{ github.actor }}@users.noreply.github.com>
           branch: terraform/fmt/${{ github.event.pull_request.head.ref_name || github.ref_name }}
-          labels: terraform-fmt, ${{ github.event.pull_request.head.ref_name || github.ref_name }}
+          signoff: false
+          delete-branch: true
           title: Terraform fmt
           body: |
             Terraform fmt was launched and corrected the formatting in this pull request:
             ```
             ${{ steps.fmt.outputs.stdout }}
             ```
+          labels: | 
+            terraform-fmt
+            automated pr
+            ${{ github.event.pull_request.head.ref_name || github.ref_name }}
+          assignees: ${{ github.actor }}
+          reviewers: ${{ github.actor }}
