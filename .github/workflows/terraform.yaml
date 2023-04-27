@@ -179,7 +179,8 @@ jobs:
     needs:
       - fmt
       - workspace
-    if: ${{ needs.fmt.outputs.status == 'false' && needs.workspace.outputs.status == 'true' && github.event_name == 'pull_request' }}
+    if: ${{ needs.fmt.outputs.status == 'false' && needs.workspace.outputs.status == 'true' }}
+#    if: ${{ needs.fmt.outputs.status == 'false' && needs.workspace.outputs.status == 'true' && github.event_name == 'pull_request' }}
     runs-on: ${{ inputs.github-runner }}
 
     steps:
