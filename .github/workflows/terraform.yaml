@@ -179,7 +179,8 @@ jobs:
     needs:
       - fmt
       - workspace
-    if: ${{ needs.fmt.outputs.status == 'false' && needs.workspace.outputs.status == 'true' && github.event_name == 'pull_request' }}
+    if: ${{ needs.fmt.outputs.status == 'false' && needs.workspace.outputs.status == 'true' }}
+#    if: ${{ needs.fmt.outputs.status == 'false' && needs.workspace.outputs.status == 'true' && github.event_name == 'pull_request' }}
     runs-on: ${{ inputs.github-runner }}
 
     steps:
@@ -191,7 +192,7 @@ jobs:
         with:
           github_token: ${{ secrets.PAT }}
           working_directory: ${{ inputs.environments-directory }}/${{ github.event.pull_request.head.ref_name || github.ref_name }}
-          reporter: github-pr-check
+#          reporter: github-pr-check
           fail_on_error: true
           filter_mode: nofilter
           level: error
@@ -203,7 +204,8 @@ jobs:
     needs:
       - fmt
       - workspace
-    if: ${{ needs.fmt.outputs.status == 'false' && needs.workspace.outputs.status == 'true' && github.event_name == 'pull_request' }}
+    if: ${{ needs.fmt.outputs.status == 'false' && needs.workspace.outputs.status == 'true' }}
+#    if: ${{ needs.fmt.outputs.status == 'false' && needs.workspace.outputs.status == 'true' && github.event_name == 'pull_request' }}
     runs-on: ${{ inputs.github-runner }}
 
     steps:
@@ -215,7 +217,7 @@ jobs:
         with:
           github_token: ${{ secrets.PAT }}
           working_directory: ${{ inputs.environments-directory }}/${{ github.event.pull_request.head.ref_name || github.ref_name }}
-          reporter: github-pr-check
+#          reporter: github-pr-check
           fail_on_error: true
           filter_mode: nofilter
           level: error
